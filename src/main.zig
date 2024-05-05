@@ -11,13 +11,15 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    if (args.len < 3) {
+    if (args.len < 4) {
         std.log.err("Usage: {s} <input.bdf> <input.zon> <output-dir>", .{args[0]});
         std.process.exit(1);
     }
 
     const inputFile = args[1];
-    const outputPath = args[2];
+    const inputConfig = args[2];
+    _ = inputConfig; // autofix
+    const outputPath = args[3];
     _ = outputPath; // autofix
 
     // Read font
