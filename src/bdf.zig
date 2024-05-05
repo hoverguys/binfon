@@ -27,6 +27,7 @@ const Font = struct {
         while (iterator.next()) |char| {
             char.deinit(allocator);
         }
+        allocator.free(self.name);
         self.characters.deinit();
     }
 };
@@ -40,9 +41,13 @@ const Command = enum {
     _IGNORED,
 };
 
-const Line = struct {
-    command: Command,
-    params: []const u8,
+const ParsedCommand = union(Command) {
+    FONT: []const u8,
+    FONTBOUNDINGBOX: struct { width: u8, height: u8 },
+    ENCODING: u16,
+    BITMAP: void,
+    STARTCHAR: []const u8,
+    _IGNORED: void,
 };
 
 pub fn parse(allocator: std.mem.Allocator, bdf: anytype) !Font {
@@ -56,55 +61,77 @@ pub fn parse(allocator: std.mem.Allocator, bdf: anytype) !Font {
     var bufferedReader = std.io.bufferedReader(bdf);
     var reader = bufferedReader.reader();
 
-    var currentName: []const u8 = undefined;
+    var arenaAllocator = std.heap.ArenaAllocator.init(allocator);
+    defer arenaAllocator.deinit();
+
+    var currentName: []u8 = undefined;
     var currentCharacter: u16 = 0;
     while (true) {
         var lineBuffer: [1024]u8 = undefined;
         const nextLine = try reader.readUntilDelimiterOrEof(&lineBuffer, '\n') orelse break;
 
         // Parse line
-        const line = try parseLine(nextLine);
-        switch (line.command) {
-            .FONT => {
-                font.name = line.params;
-                std.log.debug("Font: {s}", .{font.name});
+        const line = try parseLine(arenaAllocator.allocator(), nextLine);
+        switch (line) {
+            .FONT => |name| {
+                font.name = try allocator.dupe(u8, name);
+                std.log.debug("Font: {s}", .{name});
             },
-            .FONTBOUNDINGBOX => {
-                var boundingBox = std.mem.splitScalar(u8, line.params, ' ');
-                font.width = try std.fmt.parseInt(u8, boundingBox.next().?, 10);
-                font.height = try std.fmt.parseInt(u8, boundingBox.next().?, 10);
-
-                std.log.debug("Bounding box: {d}x{d}", .{ font.width, font.height });
+            .FONTBOUNDINGBOX => |box| {
+                font.width = box.width;
+                font.height = box.height;
+                std.log.debug("Bounding box: {d}x{d}", .{ box.width, box.height });
+            },
+            .STARTCHAR => |name| {
+                currentName = try allocator.dupe(u8, name);
+            },
+            .ENCODING => |num| {
+                currentCharacter = num;
             },
             .BITMAP => {
                 const bitmap = try readBitmap(allocator, font.width, font.height, reader);
                 try font.characters.put(currentCharacter, .{
-                    .name = try allocator.dupe(u8, currentName),
+                    .name = currentName,
                     .bitmap = bitmap,
                 });
             },
-            .STARTCHAR => {
-                currentName = line.params;
-            },
-            .ENCODING => {
-                // This probably breaks with custom encodings, not doing anything for now
-                currentCharacter = try std.fmt.parseInt(u16, line.params, 10);
-            },
-            else => {},
+            ._IGNORED => {},
         }
     }
 
     return font;
 }
 
-fn parseLine(line: []const u8) !Line {
+fn parseLine(allocator: std.mem.Allocator, line: []const u8) !ParsedCommand {
     const firstSpace = std.mem.indexOfScalar(u8, line, ' ') orelse line.len;
-    const command = line[0..firstSpace];
+    const command = std.meta.stringToEnum(Command, line[0..firstSpace]) orelse Command._IGNORED;
 
-    return .{
-        .command = std.meta.stringToEnum(Command, command) orelse Command._IGNORED,
-        .params = if (firstSpace == line.len) "" else line[firstSpace + 1 ..],
-    };
+    const rest = if (firstSpace == line.len) "" else line[firstSpace + 1 ..];
+
+    switch (command) {
+        .ENCODING => {
+            return ParsedCommand{ .ENCODING = try std.fmt.parseInt(u16, rest, 10) };
+        },
+        .BITMAP => {
+            return ParsedCommand{ .BITMAP = {} };
+        },
+        .STARTCHAR => {
+            return ParsedCommand{ .STARTCHAR = try allocator.dupe(u8, rest) };
+        },
+        .FONT => {
+            return ParsedCommand{ .FONT = try allocator.dupe(u8, rest) };
+        },
+        .FONTBOUNDINGBOX => {
+            var boundingBox = std.mem.splitScalar(u8, rest, ' ');
+            return ParsedCommand{ .FONTBOUNDINGBOX = .{
+                .width = try std.fmt.parseInt(u8, boundingBox.next().?, 10),
+                .height = try std.fmt.parseInt(u8, boundingBox.next().?, 10),
+            } };
+        },
+        ._IGNORED => {
+            return ParsedCommand{ ._IGNORED = {} };
+        },
+    }
 }
 
 fn readBitmap(
