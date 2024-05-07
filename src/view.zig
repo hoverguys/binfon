@@ -33,7 +33,7 @@ pub fn main() !void {
                 const next = try reader.readByte();
                 std.debug.print("{x}: ", .{y});
                 for (0..8) |x| {
-                    if (@as(u1, @truncate(next >> @truncate(8 - x))) == 1) {
+                    if (@as(u1, @truncate(next >> @truncate(7 - x))) == 1) {
                         std.debug.print("*", .{});
                     } else {
                         std.debug.print(" ", .{});
