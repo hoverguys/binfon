@@ -1,6 +1,11 @@
 const std = @import("std");
 const bdf = @import("bdf.zig");
 
+const FontConfig = struct {
+    inputFile: []const u8,
+    outputFile: []const u8,
+};
+
 pub fn main() !void {
     // Get allocator
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -11,21 +16,36 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    if (args.len < 4) {
-        std.log.err("Usage: {s} <input.bdf> <input.zon> <output-dir>", .{args[0]});
+    if (args.len < 2) {
+        std.log.err("Usage: {s} <config.json>", .{args[0]});
         std.process.exit(1);
     }
 
-    const inputFile = args[1];
-    const inputConfig = args[2];
-    _ = inputConfig; // autofix
-    const outputPath = args[3];
-    _ = outputPath; // autofix
+    const inputConfig = args[1];
 
-    // Read font
-    const input = try std.fs.cwd().openFile(inputFile, .{});
+    // Read config
+    const configFile = try std.fs.cwd().readFileAlloc(allocator, inputConfig, std.math.maxInt(usize));
+    defer allocator.free(configFile);
+
+    const fontConfig = try readConfig(allocator, configFile);
+    defer fontConfig.deinit();
+
+    const input = try std.fs.cwd().openFile(fontConfig.value.inputFile, .{});
     defer input.close();
 
     var font = try bdf.parse(allocator, input.reader());
     defer font.deinit(allocator);
+}
+
+fn readConfig(allocator: std.mem.Allocator, input: []u8) !std.json.Parsed(FontConfig) {
+    const fontConfig = try std.json.parseFromSlice(
+        FontConfig,
+        allocator,
+        input,
+        .{
+            .ignore_unknown_fields = true,
+        },
+    );
+
+    return fontConfig;
 }
