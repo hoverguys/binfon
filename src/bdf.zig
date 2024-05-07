@@ -134,6 +134,58 @@ fn parseLine(allocator: std.mem.Allocator, line: []const u8) !ParsedCommand {
     }
 }
 
+test "parseLine: Parses FONTBOUNDINGBOX correctly" {
+    const allocator = std.testing.allocator;
+    const line = "FONTBOUNDINGBOX 10 20";
+    const parsed = try parseLine(allocator, line);
+
+    try std.testing.expectEqual(ParsedCommand{ .FONTBOUNDINGBOX = .{ .width = 10, .height = 20 } }, parsed);
+}
+
+test "parseLine: Parses ENCODING correctly" {
+    const allocator = std.testing.allocator;
+    const line = "ENCODING 123";
+    const parsed = try parseLine(allocator, line);
+
+    try std.testing.expectEqual(ParsedCommand{ .ENCODING = 123 }, parsed);
+}
+
+test "parseLine: Parses STARTCHAR correctly" {
+    const allocator = std.testing.allocator;
+    const line = "STARTCHAR ABC";
+    const parsed = try parseLine(allocator, line);
+
+    switch (parsed) {
+        .STARTCHAR => |name| {
+            try std.testing.expectEqualStrings("ABC", name);
+            allocator.free(name);
+        },
+        else => unreachable,
+    }
+}
+
+test "parseLine: Parses FONT correctly" {
+    const allocator = std.testing.allocator;
+    const line = "FONT ABC";
+    const parsed = try parseLine(allocator, line);
+
+    switch (parsed) {
+        .FONT => |name| {
+            try std.testing.expectEqualStrings("ABC", name);
+            allocator.free(name);
+        },
+        else => unreachable,
+    }
+}
+
+test "parseLine: Parses BITMAP correctly" {
+    const allocator = std.testing.allocator;
+    const line = "BITMAP";
+    const parsed = try parseLine(allocator, line);
+
+    try std.testing.expectEqual(ParsedCommand{ .BITMAP = {} }, parsed);
+}
+
 fn readBitmap(
     allocator: std.mem.Allocator,
     width: u8,
@@ -180,4 +232,37 @@ fn readBitmap(
     }
 
     return char;
+}
+
+test "readBitmap: Reads bitmap correctly for < 8px wide glyphs" {
+    const allocator = std.testing.allocator;
+
+    var reader = std.io.fixedBufferStream("10\n20\n30\nENDCHAR");
+
+    const bitmap = try readBitmap(allocator, 8, 3, reader.reader());
+    try std.testing.expectEqual(@as(usize, 3), bitmap.len);
+    try std.testing.expectEqualSlices(u8, &[_]u8{0x10}, bitmap[0]);
+    try std.testing.expectEqualSlices(u8, &[_]u8{0x20}, bitmap[1]);
+    try std.testing.expectEqualSlices(u8, &[_]u8{0x30}, bitmap[2]);
+
+    for (bitmap) |line| {
+        allocator.free(line);
+    }
+    allocator.free(bitmap);
+}
+
+test "readBitmap: Reads bitmap correctly for > 8px wide glyphs" {
+    const allocator = std.testing.allocator;
+
+    var reader = std.io.fixedBufferStream("1234\nABDC\nENDCHAR");
+
+    const bitmap = try readBitmap(allocator, 16, 2, reader.reader());
+    try std.testing.expectEqual(@as(usize, 2), bitmap.len);
+    try std.testing.expectEqualSlices(u8, &[_]u8{ 0x12, 0x34 }, bitmap[0]);
+    try std.testing.expectEqualSlices(u8, &[_]u8{ 0xAB, 0xDC }, bitmap[1]);
+
+    for (bitmap) |line| {
+        allocator.free(line);
+    }
+    allocator.free(bitmap);
 }
