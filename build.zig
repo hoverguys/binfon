@@ -27,10 +27,28 @@ pub fn build(b: *std.Build) void {
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
 
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
-
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
+
+    // Viewer debug app
+
+    const viewer = b.addExecutable(.{
+        .name = "binfon-viewer",
+        .root_source_file = b.path("src/view.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    b.installArtifact(viewer);
+
+    const view_cmd = b.addRunArtifact(viewer);
+    view_cmd.step.dependOn(b.getInstallStep());
+
+    const view_step = b.step("view", "Run the app");
+    view_step.dependOn(&view_cmd.step);
+
+    if (b.args) |args| {
+        run_cmd.addArgs(args);
+        view_cmd.addArgs(args);
+    }
 }
