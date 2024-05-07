@@ -16,7 +16,7 @@ const Character = struct {
 };
 const CharacterMap = std.AutoHashMap(u16, Character);
 
-const Font = struct {
+pub const Font = struct {
     name: []const u8,
     height: u8,
     width: u8,

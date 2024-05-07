@@ -3,3 +3,5 @@ zig-out
 *.bdf
 out
 *.font.json
+*.exe
+*.bin
