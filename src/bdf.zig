@@ -30,6 +30,58 @@ pub const Font = struct {
         allocator.free(self.name);
         self.characters.deinit();
     }
+
+    pub fn parse(allocator: std.mem.Allocator, bdf: anytype) !Font {
+        var font: Font = .{
+            .name = undefined,
+            .height = 0,
+            .width = 0,
+            .characters = CharacterMap.init(allocator),
+        };
+
+        var bufferedReader = std.io.bufferedReader(bdf);
+        var reader = bufferedReader.reader();
+
+        var arenaAllocator = std.heap.ArenaAllocator.init(allocator);
+        defer arenaAllocator.deinit();
+
+        var currentName: []u8 = undefined;
+        var currentCharacter: u16 = 0;
+        while (true) {
+            var lineBuffer: [1024]u8 = undefined;
+            const nextLine = try reader.readUntilDelimiterOrEof(&lineBuffer, '\n') orelse break;
+
+            // Parse line
+            const line = try parseLine(arenaAllocator.allocator(), nextLine);
+            switch (line) {
+                .FONT => |name| {
+                    font.name = try allocator.dupe(u8, name);
+                    std.log.debug("Font: {s}", .{name});
+                },
+                .FONTBOUNDINGBOX => |box| {
+                    font.width = box.width;
+                    font.height = box.height;
+                    std.log.debug("Bounding box: {d}x{d}", .{ box.width, box.height });
+                },
+                .STARTCHAR => |name| {
+                    currentName = try allocator.dupe(u8, name);
+                },
+                .ENCODING => |num| {
+                    currentCharacter = num;
+                },
+                .BITMAP => {
+                    const bitmap = try readBitmap(allocator, font.width, font.height, reader);
+                    try font.characters.put(currentCharacter, .{
+                        .name = currentName,
+                        .bitmap = bitmap,
+                    });
+                },
+                ._IGNORED => {},
+            }
+        }
+
+        return font;
+    }
 };
 
 const Command = enum {
@@ -49,58 +101,6 @@ const ParsedCommand = union(Command) {
     STARTCHAR: []const u8,
     _IGNORED: void,
 };
-
-pub fn parse(allocator: std.mem.Allocator, bdf: anytype) !Font {
-    var font: Font = .{
-        .name = undefined,
-        .height = 0,
-        .width = 0,
-        .characters = CharacterMap.init(allocator),
-    };
-
-    var bufferedReader = std.io.bufferedReader(bdf);
-    var reader = bufferedReader.reader();
-
-    var arenaAllocator = std.heap.ArenaAllocator.init(allocator);
-    defer arenaAllocator.deinit();
-
-    var currentName: []u8 = undefined;
-    var currentCharacter: u16 = 0;
-    while (true) {
-        var lineBuffer: [1024]u8 = undefined;
-        const nextLine = try reader.readUntilDelimiterOrEof(&lineBuffer, '\n') orelse break;
-
-        // Parse line
-        const line = try parseLine(arenaAllocator.allocator(), nextLine);
-        switch (line) {
-            .FONT => |name| {
-                font.name = try allocator.dupe(u8, name);
-                std.log.debug("Font: {s}", .{name});
-            },
-            .FONTBOUNDINGBOX => |box| {
-                font.width = box.width;
-                font.height = box.height;
-                std.log.debug("Bounding box: {d}x{d}", .{ box.width, box.height });
-            },
-            .STARTCHAR => |name| {
-                currentName = try allocator.dupe(u8, name);
-            },
-            .ENCODING => |num| {
-                currentCharacter = num;
-            },
-            .BITMAP => {
-                const bitmap = try readBitmap(allocator, font.width, font.height, reader);
-                try font.characters.put(currentCharacter, .{
-                    .name = currentName,
-                    .bitmap = bitmap,
-                });
-            },
-            ._IGNORED => {},
-        }
-    }
-
-    return font;
-}
 
 fn parseLine(allocator: std.mem.Allocator, line: []const u8) !ParsedCommand {
     const firstSpace = std.mem.indexOfScalar(u8, line, ' ') orelse line.len;

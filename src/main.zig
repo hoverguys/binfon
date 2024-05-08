@@ -1,6 +1,5 @@
 const std = @import("std");
-const bdf = @import("bdf.zig");
-const bin = @import("bin.zig");
+const lib = @import("lib.zig");
 
 const FontConfig = struct {
     inputFile: []const u8,
@@ -36,14 +35,11 @@ pub fn main() !void {
     const input = try std.fs.cwd().openFile(fontConfig.value.inputFile, .{});
     defer input.close();
 
-    var font = try bdf.parse(allocator, input.reader());
-    defer font.deinit(allocator);
-
     // Write output
     const output = try std.fs.cwd().createFile(fontConfig.value.outputFile, .{});
     defer output.close();
 
-    try bin.writeGlyphs(output.writer(), font, fontConfig.value.glyphs);
+    try lib.convert(allocator, input.reader(), output.writer(), fontConfig.value.glyphs);
 }
 
 fn readConfig(allocator: std.mem.Allocator, input: []u8) !std.json.Parsed(FontConfig) {
