@@ -16,7 +16,7 @@ The inputs must be a .bdf file and a .json configuration file. The JSON configur
 }
 ```
 
-The output bin will contain all the glyphs in the order they are specified in the configuration without any gaps. Everything is packed using byte padding (exactly as in the BDF input file). Eg. if your font is 8x3, every character will be 3 bytes (1 byte x 3 rows), if your font is 10x8, every character will be 16 bytes (2 bytes x 10 rows).
+The output bin will contain all the glyphs in the order they are specified in the configuration without any gaps. Everything is packed using byte padding (exactly as in the BDF input file). Eg. if your font is 8x3, every character will be 3 bytes (1 byte x 3 rows), if your font is 10x8, every character will be 16 bytes (2 bytes x 8 rows).
 
 The formula to seek to a specific char should be roughly:
 ```rust
