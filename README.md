@@ -2,7 +2,7 @@
 
 Takes all your precious fonts and puts them in BINs!
 
-Allows embedding of bitmap fonts into easily embeddable binary blobs.
+Turns bitmap fonts into easily embeddable binary blobs.
 
 ## Building
 
