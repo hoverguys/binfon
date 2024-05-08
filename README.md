@@ -1,8 +1,16 @@
 # Absolutely Worthless Binfon
 
-Takes all your precious fonts and puts them in the BIN!
+Takes all your precious fonts and puts them in BINs!
 
 Allows embedding of bitmap fonts into easily embeddable binary blobs.
+
+## Building
+
+`zig build` builds two targets:
+- `binfon` is the actual executable that runs the bdf to bin transformation (see Usage below)
+- `binfon-viewer` takes a .bin and prints its glyphs to console
+
+## Usage
 
 The inputs must be a .bdf file and a .json configuration file. The JSON configuration file must be formatted as follows:
 
