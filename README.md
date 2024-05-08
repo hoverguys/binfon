@@ -33,7 +33,7 @@ fn printChar(characterIndex: usize) void {
 }
 ```
 
-for width ≤ 8px, code can be simplyfied to:
+for width ≤ 8px, code can be simplified to:
 ```rust
 const GLYPH_HEIGHT = <font.height>;
 
