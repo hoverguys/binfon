@@ -72,7 +72,7 @@ pub fn build(b: *std.Build) void {
 /// Module function for depending on the binfon module
 pub fn addModule(b: *std.Build) void {
     _ = b.addModule("binfon", .{
-        .root_source_file = .{ .path = "src/lib.zig" },
+        .root_source_file = b.path("src/lib.zig"),
     });
 }
 
@@ -89,7 +89,7 @@ fn buildLibrary(b: *std.Build, options: ModuleOptions) *std.Build.Step.Compile {
     const library = switch (options.linkage) {
         .dynamic => b.addSharedLibrary(.{
             .name = "binfon",
-            .root_source_file = .{ .path = "src/lib.zig" },
+            .root_source_file = b.path("src/lib.zig"),
             .version = version,
             .target = options.target,
             .optimize = options.optimize,
@@ -97,7 +97,7 @@ fn buildLibrary(b: *std.Build, options: ModuleOptions) *std.Build.Step.Compile {
         }),
         .static => b.addStaticLibrary(.{
             .name = "binfon",
-            .root_source_file = .{ .path = "src/lib.zig" },
+            .root_source_file = b.path("src/lib.zig"),
             .version = version,
             .target = options.target,
             .optimize = options.optimize,
